@@ -22,7 +22,6 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600"><path d="M2 9V5.2a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2V9"></path><path d="M2 15v3.8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V15"></path><rect x="2" y="9" width="20" height="6" rx="2"></rect></svg>
                 <span>肩叩き銀行 使用窓口</span>
             </div>
-            <!-- 設定ボタン -->
             <button id="setupBtn" class="text-slate-300 hover:text-slate-500 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
             </button>
@@ -30,7 +29,6 @@
     </nav>
 
     <main class="max-w-md w-full p-5 space-y-6">
-        <!-- セットアップガイド -->
         <div id="setupGuide" class="hidden p-4 bg-slate-800 text-white rounded-2xl text-[10px] space-y-2 animate-in shadow-inner">
             <p class="font-bold text-orange-400">データが見えない場合、SQL Editorで下記を実行：</p>
             <code class="block bg-black/50 p-2 rounded text-indigo-300 font-mono">
@@ -38,13 +36,11 @@
             </code>
         </div>
 
-        <!-- メッセージ -->
         <div id="messageBox" class="hidden p-4 rounded-2xl flex items-center gap-3 border animate-in shadow-sm">
             <div id="messageIcon"></div>
             <p id="messageText" class="text-sm font-bold"></p>
         </div>
 
-        <!-- QRスキャナー用オーバーレイ -->
         <div id="scannerOverlay" class="hidden fixed inset-0 z-50 bg-black flex flex-col">
             <div class="p-4 flex justify-end">
                 <button id="closeScannerBtn" class="text-white p-2 bg-white/10 rounded-full">
@@ -54,7 +50,6 @@
             <div id="reader" class="flex-1"></div>
         </div>
 
-        <!-- メインカード -->
         <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 space-y-8">
             <div class="flex justify-between items-center">
                 <h2 class="text-xl font-black tracking-tight">券を使用する</h2>
@@ -89,11 +84,11 @@
             </form>
         </div>
 
-        <!-- バランス表示 -->
-        <div id="balanceCard" class="hidden mt-4 p-8 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[2.5rem] text-white flex items-center justify-between shadow-2xl shadow-indigo-200 relative overflow-hidden">
+        <div id="balanceCard" class="hidden mt-4 p-8 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[2.5rem] text-white flex items-center justify-between shadow-2xl shadow-indigo-200 relative overflow-hidden transition-colors duration-500">
             <div class="relative z-10">
                 <p class="text-indigo-200 text-[10px] font-black uppercase tracking-widest mb-1">Balance</p>
-                <h3 class="text-xl font-bold">現在の残り回数</h3>
+                <h3 id="balanceTitle" class="text-xl font-bold">現在の残り回数</h3>
+                <p id="expiryStatus" class="text-[10px] mt-1 font-bold"></p>
             </div>
             <div class="text-6xl font-black relative z-10 tracking-tighter">
                 <span id="balanceNum">0</span><span class="text-sm ml-2 opacity-50 font-normal tracking-normal">回</span>
@@ -106,7 +101,6 @@
     </footer>
 
     <script>
-        // グローバルに定義して確実にアクセス可能にする
         (function() {
             const SUPABASE_URL = 'https://qfzyrogwyjbzbblnvqzy.supabase.co';
             const SUPABASE_KEY = 'sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw';
@@ -114,6 +108,7 @@
             let supabase;
             let html5QrCode;
             let currentCount = 0;
+            let isExpiredGlobal = false;
 
             const fetchStatus = async (id) => {
                 if (id.length < 10) {
@@ -121,10 +116,35 @@
                     return;
                 }
                 try {
-                    const { data } = await supabase.from('tickets').select('count').eq('id', id).maybeSingle();
+                    const { data } = await supabase.from('tickets').select('count, expired_at').eq('id', id).maybeSingle();
                     if (data) {
                         currentCount = data.count;
                         document.getElementById('balanceNum').innerText = currentCount;
+                        
+                        const expiryEl = document.getElementById('expiryStatus');
+                        const card = document.getElementById('balanceCard');
+                        const title = document.getElementById('balanceTitle');
+                        
+                        if (data.expired_at) {
+                            const expiryDate = new Date(data.expired_at);
+                            isExpiredGlobal = expiryDate < new Date();
+                            
+                            if (isExpiredGlobal) {
+                                expiryEl.innerText = `【期限切れ】 ${expiryDate.toLocaleDateString()} に終了しています`;
+                                card.className = card.className.replace('from-indigo-600 to-blue-700', 'from-red-600 to-rose-700');
+                                title.innerText = "この券は無効です";
+                            } else {
+                                expiryEl.innerText = `有効期限: ${expiryDate.toLocaleDateString()}`;
+                                card.className = card.className.replace('from-red-600 to-rose-700', 'from-indigo-600 to-blue-700');
+                                title.innerText = "現在の残り回数";
+                            }
+                        } else {
+                            isExpiredGlobal = false;
+                            expiryEl.innerText = '有効期限なし';
+                            card.className = card.className.replace('from-red-600 to-rose-700', 'from-indigo-600 to-blue-700');
+                            title.innerText = "現在の残り回数";
+                        }
+
                         document.getElementById('balanceCard').classList.remove('hidden');
                         updateButtonStyles();
                     } else {
@@ -221,8 +241,18 @@
 
                 setLoading(true);
                 try {
-                    const { data: ticket } = await supabase.from('tickets').select('*').eq('id', id).single();
+                    // 最新の状態を再取得して、期限と回数を厳格にチェック
+                    const { data: ticket } = await supabase.from('tickets').select('count, expired_at').eq('id', id).single();
                     if (!ticket) throw new Error('券が見つかりません。');
+                    
+                    // 【厳格チェック】有効期限の検証
+                    if (ticket.expired_at) {
+                        const expiryDate = new Date(ticket.expired_at);
+                        if (expiryDate < new Date()) {
+                            throw new Error(`この券は有効期限が切れています。(${expiryDate.toLocaleDateString()})`);
+                        }
+                    }
+
                     if (ticket.count < amount) throw new Error(`回数が足りません（残り: ${ticket.count}回）`);
 
                     const newCount = ticket.count - amount;
@@ -243,16 +273,14 @@
                 document.getElementById('setupGuide').classList.toggle('hidden');
             };
 
-            // 初期化
             window.onload = () => {
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 
-                // イベントリスナーの登録（onclickを使わずに安全に登録）
                 document.getElementById('setupBtn').onclick = toggleSetup;
                 document.getElementById('scanBtn').onclick = startScanner;
                 document.getElementById('closeScannerBtn').onclick = stopScanner;
                 document.getElementById('allBtn').onclick = () => {
-                    if (currentCount > 0) {
+                    if (currentCount > 0 && !isExpiredGlobal) {
                         document.getElementById('amount').value = currentCount;
                         updateButtonStyles();
                     }
@@ -273,7 +301,6 @@
                 document.getElementById('useForm').onsubmit = handleUse;
             };
 
-            // windowオブジェクトに関数を公開（保険）
             window.toggleSetup = toggleSetup;
             window.startScanner = startScanner;
             window.stopScanner = stopScanner;
